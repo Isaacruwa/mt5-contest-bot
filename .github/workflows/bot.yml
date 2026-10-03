@@ -11,12 +11,16 @@ concurrency:
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
+      - name: Note start time
+        run: echo "START=$(date +%s)" >> "$GITHUB_ENV"
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
@@ -46,3 +50,13 @@ jobs:
         with:
           path: state.json
           key: state-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Chain the next run (keeps the bot always on)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ELAPSED=$(( $(date +%s) - START ))
+          if [ "$ELAPSED" -lt 200 ]; then sleep $(( 200 - ELAPSED )); fi
+          gh workflow run bot.yml --ref main
