@@ -16,6 +16,7 @@ import asyncio
 import json
 import math
 import os
+import re
 import sys
 import time
 import logging
@@ -417,6 +418,10 @@ class Bot:
         if chat != S["owner"]:
             return
 
+        # forgiving input: "LOGIN PASSWORD SERVER" sent without /connect works too
+        if not text.startswith("/") and re.match(r"^\d{4,}\s+\S+\s+\S+", text):
+            cmd, rest = "/connect", text
+
         if cmd == "/connect":
             try:                                   # remove the message with the password first
                 await self.tg("deleteMessage", chat_id=chat, message_id=m["message_id"])
@@ -424,7 +429,8 @@ class Bot:
                 pass
             parts = rest.split(None, 2)
             if len(parts) < 3:
-                await self.say("Format: /connect LOGIN PASSWORD SERVER")
+                await self.say("Almost! Now send ONE message with your login, password and server "
+                               "separated by spaces, like this:\n123456 MyPassword MetaQuotes-Demo")
                 return
             await self.do_connect(*parts)
         elif cmd == "/disconnect":
