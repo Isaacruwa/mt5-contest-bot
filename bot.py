@@ -546,11 +546,20 @@ class Bot:
                                f"Next: /backtest, then /go.")
         except Exception as e:
             log.warning("connect failed: %s", e)
-            if not self.warned_conn:
-                self.warned_conn = True
+            msg = str(e)
+            if "top up" in msg.lower():
+                self.next_try = time.time() + 600          # retry every 10 minutes
+                if time.time() - S.get("conn_warn_ts", 0) > 6 * 3600:
+                    S["conn_warn_ts"] = time.time()
+                    await self.say("💳 MetaApi needs credit before it can start your MT5 account "
+                                   "(its message: top up your account). Add credit or start a trial on the "
+                                   "MetaApi billing page. I retry by myself every 10 minutes and will message "
+                                   "you when you're logged in.")
+            elif time.time() - S.get("conn_warn_ts", 0) > 3600:
+                S["conn_warn_ts"] = time.time()
                 await self.say("⏳ Still connecting to the MT5 account. If this lasts more than ~10 minutes, "
                                "the login/password/server is probably wrong: /disconnect and /connect again. "
-                               f"({str(e)[:150]})")
+                               f"({msg[:150]})")
 
     # -- account helpers
     async def my_positions(self):
