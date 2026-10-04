@@ -1,0 +1,27 @@
+name: mt5-adapter-test
+on: workflow_dispatch
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache wine prefix
+        uses: actions/cache@v4
+        with:
+          path: ~/.wine-mt5
+          key: wine-mt5-v2
+
+      - name: Install Wine, MT5 and Python
+        run: bash ci/setup_wine.sh
+
+      - name: Adapter test on real MT5
+        env:
+          MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
+          MT5_SERVER: ${{ secrets.MT5_SERVER }}
+          MT5_PASSWORDS: ${{ secrets.MT5_PASSWORDS }}
+        run: |
+          source ci/wine_env.sh
+          wine 'C:\Python311\python.exe' adapter_test.py

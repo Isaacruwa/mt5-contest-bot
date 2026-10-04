@@ -1,0 +1,64 @@
+name: mt5-bot
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: mt5-bot
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 345
+    steps:
+      - name: Note start time
+        run: echo "START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v4
+
+      - name: Cache wine prefix
+        uses: actions/cache@v4
+        with:
+          path: ~/.wine-mt5
+          key: wine-mt5-v2
+
+      - name: Install Wine, MT5 and Python
+        run: bash ci/setup_wine.sh
+
+      - name: Restore saved state
+        uses: actions/cache/restore@v4
+        with:
+          path: state.json
+          key: mt5state-restore-miss
+          restore-keys: |
+            mt5state-
+
+      - name: Run the bot (about 5 hours, then hands over to the next run)
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          RUN_SECONDS: "18600"
+        run: |
+          source ci/wine_env.sh
+          wine 'C:\Python311\python.exe' run_mt5.py
+
+      - name: Save state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state.json
+          key: mt5state-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Start the next run
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ELAPSED=$(( $(date +%s) - START ))
+          if [ "$ELAPSED" -lt 600 ]; then sleep $(( 600 - ELAPSED )); fi
+          gh workflow run mt5-bot.yml --ref main
