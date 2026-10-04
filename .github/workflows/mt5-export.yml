@@ -1,0 +1,44 @@
+name: mt5-export
+on: workflow_dispatch
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache wine prefix
+        uses: actions/cache@v4
+        with:
+          path: ~/.wine-mt5
+          key: wine-mt5-v2
+
+      - name: Install Wine, MT5 and Python
+        run: bash ci/setup_wine.sh
+
+      - name: Export price history from MT5
+        env:
+          MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
+          MT5_SERVER: ${{ secrets.MT5_SERVER }}
+          MT5_PASSWORDS: ${{ secrets.MT5_PASSWORDS }}
+        run: |
+          source ci/wine_env.sh
+          wine 'C:\Python311\python.exe' export_data.py
+          ls -la data
+
+      - name: Publish data to the data branch
+        run: |
+          set -e
+          mkdir -p /tmp/dd && cp data/* /tmp/dd/
+          git config user.name "export-bot"
+          git config user.email "export-bot@users.noreply.github.com"
+          git checkout --orphan data
+          git rm -rf . > /dev/null
+          cp /tmp/dd/* .
+          git add -A
+          git commit -m "price data export"
+          git push -f origin data
