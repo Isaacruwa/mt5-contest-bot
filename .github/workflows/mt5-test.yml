@@ -10,6 +10,7 @@ jobs:
     env:
       WINEPREFIX: /home/runner/.mt5
       WINEDEBUG: "-all"
+      WINEDLLOVERRIDES: "mscoree,mshtml="
       DISPLAY: ":99"
     steps:
       - uses: actions/checkout@v4
@@ -28,8 +29,9 @@ jobs:
         run: |
           Xvfb :99 -screen 0 1280x1024x24 &
           sleep 3
-          wineboot --init
-          winecfg -v win10 || true
+          timeout 300 wineboot --init || echo "wineboot timed out or failed: $?"
+          timeout 120 winecfg -v win10 || echo "winecfg timed out or failed: $?"
+          timeout 60 wine cmd /c echo wine-works || echo "wine cmd failed: $?"
 
       - name: Install MetaTrader 5 (silent)
         run: |
@@ -46,7 +48,7 @@ jobs:
       - name: Install Windows Python and the MetaTrader5 package (inside Wine)
         run: |
           wget -q https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe
-          wine python-3.10.11-amd64.exe /quiet InstallAllUsers=1 PrependPath=1 Include_test=0
+          timeout 600 wine python-3.10.11-amd64.exe /quiet InstallAllUsers=1 PrependPath=1 Include_test=0 || echo "python installer exit: $?"
           wineserver -w || true
           PYW='C:\Program Files\Python310\python.exe'
           wine "$PYW" --version
@@ -60,4 +62,4 @@ jobs:
           MT5_SERVER: ${{ secrets.MT5_SERVER }}
         run: |
           PYW='C:\Program Files\Python310\python.exe'
-          wine "$PYW" mt5/test_mt5.py
+          timeout 600 wine "$PYW" mt5/test_mt5.py
