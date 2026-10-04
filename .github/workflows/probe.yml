@@ -1,0 +1,75 @@
+name: probe-mt5
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      WINEPREFIX: /home/runner/.wine
+      WINEARCH: win64
+      WINEDEBUG: "-all"
+      DISPLAY: ":99"
+      PY: C:\Program Files\Python311\python.exe
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Wine and Xvfb
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo mkdir -pm755 /etc/apt/keyrings
+          sudo wget -q -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key
+          sudo wget -q -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/noble/winehq-noble.sources
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --install-recommends winehq-stable xvfb
+          wine --version
+
+      - name: Start virtual display
+        run: |
+          setsid nohup Xvfb :99 -screen 0 1280x800x24 >/tmp/xvfb.log 2>&1 &
+          sleep 3
+          echo "xvfb started"
+
+      - name: Create Wine prefix
+        run: |
+          wineboot --init
+          wineserver -w || true
+          ls "$WINEPREFIX/drive_c" | head
+
+      - name: Install MetaTrader 5
+        run: |
+          wget -q -O mt5setup.exe https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe
+          ls -la mt5setup.exe
+          (timeout 900 wine mt5setup.exe /auto >/tmp/mt5setup.log 2>&1 &)
+          for i in $(seq 1 180); do
+            if [ -f "$WINEPREFIX/drive_c/Program Files/MetaTrader 5/terminal64.exe" ]; then echo "terminal64.exe found after $((i*5))s"; break; fi
+            sleep 5
+          done
+          sleep 30
+          ls -la "$WINEPREFIX/drive_c/Program Files/MetaTrader 5/" | head -20
+          wineserver -k || true
+          sleep 3
+
+      - name: Install Python (inside Wine)
+        run: |
+          wget -q -O pyinst.exe https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe
+          wine pyinst.exe /quiet InstallAllUsers=1 PrependPath=1 Include_test=0 Include_launcher=0
+          wineserver -w || true
+          ls "$WINEPREFIX/drive_c/Program Files/Python311/" | head
+          wine "$PY" --version
+
+      - name: Install MetaTrader5 Python package
+        run: wine "$PY" -m pip install --no-warn-script-location MetaTrader5
+
+      - name: Probe MT5 login
+        env:
+          MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
+          MT5_SERVER: ${{ secrets.MT5_SERVER }}
+          MT5_PASSWORD: ${{ secrets.MT5_PASSWORD }}
+          MT5_PASSWORD_ALT: ${{ secrets.MT5_PASSWORD_ALT }}
+        run: timeout 600 wine "$PY" probe_mt5.py
