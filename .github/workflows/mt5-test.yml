@@ -1,0 +1,63 @@
+name: mt5-test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      WINEPREFIX: /home/runner/.mt5
+      WINEDEBUG: "-all"
+      DISPLAY: ":99"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Wine (WineHQ stable) and Xvfb
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo mkdir -pm755 /etc/apt/keyrings
+          sudo wget -q -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key
+          sudo wget -q -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/noble/winehq-noble.sources
+          sudo apt-get update -q
+          sudo apt-get install -y -q --install-recommends winehq-stable xvfb winbind
+          wine --version
+
+      - name: Start virtual display and create Wine prefix
+        run: |
+          Xvfb :99 -screen 0 1280x1024x24 &
+          sleep 3
+          wineboot --init
+          winecfg -v win10 || true
+
+      - name: Install MetaTrader 5 (silent)
+        run: |
+          wget -q https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe
+          wine mt5setup.exe /auto &
+          for i in $(seq 1 120); do
+            if [ -f "$WINEPREFIX/drive_c/Program Files/MetaTrader 5/terminal64.exe" ]; then break; fi
+            sleep 5
+          done
+          sleep 30
+          wineserver -k || true
+          ls "$WINEPREFIX/drive_c/Program Files/MetaTrader 5/" | head -20
+
+      - name: Install Windows Python and the MetaTrader5 package (inside Wine)
+        run: |
+          wget -q https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe
+          wine python-3.10.11-amd64.exe /quiet InstallAllUsers=1 PrependPath=1 Include_test=0
+          wineserver -w || true
+          PYW='C:\Program Files\Python310\python.exe'
+          wine "$PYW" --version
+          wine "$PYW" -m pip install --upgrade pip
+          wine "$PYW" -m pip install MetaTrader5
+
+      - name: Log in to the demo account and read prices
+        env:
+          MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
+          MT5_PASSWORD: ${{ secrets.MT5_PASSWORD }}
+          MT5_SERVER: ${{ secrets.MT5_SERVER }}
+        run: |
+          PYW='C:\Program Files\Python310\python.exe'
+          wine "$PYW" mt5/test_mt5.py
