@@ -12,7 +12,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.wine-mt5
-          key: wine-mt5-v1
+          key: wine-mt5-v2
 
       - name: Install Wine, MT5 and Python
         run: bash ci/setup_wine.sh

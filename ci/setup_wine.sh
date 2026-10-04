@@ -32,7 +32,7 @@ wget -q -O /tmp/python.exe "https://www.python.org/ftp/python/3.11.9/python-3.11
 wine /tmp/python.exe /quiet InstallAllUsers=1 TargetDir='C:\Python311' PrependPath=1 Include_launcher=0 Include_test=0
 wineserver -w || true
 wine 'C:\Python311\python.exe' -m pip install --no-warn-script-location --upgrade pip
-wine 'C:\Python311\python.exe' -m pip install --no-warn-script-location MetaTrader5 aiohttp
+wine 'C:\Python311\python.exe' -m pip install --no-warn-script-location "numpy==1.26.4" MetaTrader5 aiohttp
 wine 'C:\Python311\python.exe' -c "import MetaTrader5, aiohttp; print('python packages ok', MetaTrader5.__version__)"
 
 touch "$WINEPREFIX/.setup_done"
