@@ -22,7 +22,7 @@ jobs:
           sudo wget -q -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key
           sudo wget -q -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/noble/winehq-noble.sources
           sudo apt-get update -q
-          sudo apt-get install -y -q --install-recommends winehq-stable xvfb winbind
+          sudo apt-get install -y -q --install-recommends winehq-stable xvfb winbind x11-utils
           wine --version
 
       - name: Start virtual display and create Wine prefix
@@ -33,17 +33,26 @@ jobs:
           timeout 120 winecfg -v win10 || echo "winecfg timed out or failed: $?"
           timeout 60 wine cmd /c echo wine-works || echo "wine cmd failed: $?"
 
-      - name: Install MetaTrader 5 (silent)
+      - name: Install WebView2 runtime and MetaTrader 5
         run: |
+          wget -q https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/c1336fd6-a2eb-4669-9b03-949fc70ace0e/MicrosoftEdgeWebview2Setup.exe
+          timeout 300 wine MicrosoftEdgeWebview2Setup.exe /silent /install || echo "webview2 installer exit: $?"
+          wineserver -w || true
           wget -q https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe
-          wine mt5setup.exe /auto &
-          for i in $(seq 1 120); do
-            if [ -f "$WINEPREFIX/drive_c/Program Files/MetaTrader 5/terminal64.exe" ]; then break; fi
+          wine mt5setup.exe /auto > /tmp/mt5setup.log 2>&1 &
+          F=""
+          for i in $(seq 1 48); do
+            F=$(find "$WINEPREFIX/drive_c" -iname terminal64.exe 2>/dev/null | head -1)
+            if [ -n "$F" ]; then echo "found: $F"; break; fi
             sleep 5
           done
+          echo "--- processes"; ps aux | grep -i -E "mt5|wine|setup" | grep -v grep | cut -c1-180 || true
+          echo "--- windows"; xwininfo -root -tree | grep -E '"' | head -30 || true
+          echo "--- installer log"; tail -30 /tmp/mt5setup.log || true
+          echo "--- metatrader folders"; find "$WINEPREFIX/drive_c" -maxdepth 3 -iname "*metatrader*" 2>/dev/null || true
+          if [ -z "$F" ]; then echo "terminal64.exe was NOT installed"; exit 1; fi
           sleep 30
           wineserver -k || true
-          ls "$WINEPREFIX/drive_c/Program Files/MetaTrader 5/" | head -20
 
       - name: Install Windows Python and the MetaTrader5 package (inside Wine)
         run: |
@@ -62,4 +71,6 @@ jobs:
           MT5_SERVER: ${{ secrets.MT5_SERVER }}
         run: |
           PYW='C:\Program Files\Python310\python.exe'
+          TERM=$(find "$WINEPREFIX/drive_c" -iname terminal64.exe | head -1)
+          echo "terminal at: $TERM"
           timeout 600 wine "$PYW" mt5/test_mt5.py
