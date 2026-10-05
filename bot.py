@@ -59,20 +59,20 @@ TUNABLES = {
     "PROFILE": ("contest", str),
     "INITIAL_BALANCE": (10000.0, float),
     "DAY_START_REF": (0.0, float),          # >0: day-start balance to use on the very first day
-    "SYMBOLS": ("EURUSD,GBPUSD,USDJPY,XAUUSD", str),
+    "SYMBOLS": ("XAUUSD", str),
     "TIMEFRAME": ("5m", str),
     "FAST_EMA": (50, int),
     "SLOW_EMA": (200, int),
     "RSI_N": (7, int),
-    "RSI_BUY": (30.0, float),
-    "RSI_SELL": (70.0, float),
+    "RSI_BUY": (25.0, float),
+    "RSI_SELL": (75.0, float),
     "ATR_N": (14, int),
-    "TP_ATR": (0.8, float),
-    "SL_ATR": (1.6, float),
+    "TP_ATR": (3.0, float),
+    "SL_ATR": (2.0, float),
     "COOLDOWN": (2, int),
-    "MAX_HOLD": (60, int),
-    "MAX_POS_SYMBOL": (2, int),
-    "MAX_POS_TOTAL": (4, int),
+    "MAX_HOLD": (48, int),
+    "MAX_POS_SYMBOL": (1, int),
+    "MAX_POS_TOTAL": (1, int),
     "BUDGET_USE": (60.0, float),            # % of distance to nearest limit usable as open risk
     "PER_TRADE": (15.0, float),             # % of that budget risked per trade
     "EMERGENCY_BUF": (0.7, float),          # % of initial balance
