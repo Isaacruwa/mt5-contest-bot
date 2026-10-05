@@ -635,6 +635,14 @@ class Bot:
             self.risk.emergency = False
             await self.close_all(positions)
             return
+        # time stop (same rule as the backtest): close trades that are older than MAX_HOLD bars
+        stale = [p for p in positions if p.get("openTime")
+                 and (now - to_dt(p["openTime"])).total_seconds() > MAX_HOLD * TF_SECONDS]
+        if stale:
+            for p in stale:
+                await self.say(f"⏱ Time stop: closing {p['symbol']}")
+            await self.close_all(stale)
+            positions = [p for p in positions if p not in stale]
         if not S.get("enabled") or self.risk.locked():
             return
         await self.news.refresh(self.http)
@@ -705,7 +713,11 @@ class Bot:
                 S["since"][sym] = 0
                 await self.say(f"{'🟢 BUY' if d > 0 else '🔴 SELL'} {sym} {lots} lots  SL {sl}  TP {tp}")
             except Exception as e:
-                await self.say(f"Order failed on {sym}: {e}")
+                key = str(e)[:70]
+                fails = S.setdefault("fail_ts", {})
+                if time.time() - fails.get(key, 0) > 1800:          # same error: tell you at most every 30 min
+                    fails[key] = time.time()
+                    await self.say(f"Order failed on {sym}: {e}")
             return                            # one new trade per cycle keeps risk accounting exact
 
     async def cycle_safe(self):

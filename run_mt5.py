@@ -71,9 +71,11 @@ class Mt5Adapter:
 
     async def get_positions(self):
         ps = mt5.positions_get() or []
+        off = self.offset()
         return [dict(id=p.ticket, symbol=p.symbol, type=p.type, volume=p.volume, openPrice=p.price_open,
                      currentPrice=p.price_current, stopLoss=p.sl, takeProfit=p.tp, profit=p.profit,
-                     magic=p.magic) for p in ps]
+                     magic=p.magic, openTime=datetime.fromtimestamp(int(p.time) - off, tz=timezone.utc))
+                for p in ps]
 
     async def get_symbol_specification(self, sym):
         self._ensure(sym)
@@ -177,6 +179,10 @@ async def ensure_connected(self):
         if ai is None or ai.login != int(creds["login"]):
             raise RuntimeError("MT5 is logged into a different account than the one you gave")
         self.conn = self.account = Mt5Adapter()
+        ti = mt5.terminal_info()
+        if ti is not None and not ti.trade_allowed and not S.get("algo_warned"):
+            S["algo_warned"] = True
+            await self.say("⚠️ MT5 reports algorithmic trading is switched off, so orders will be rejected.")
         if not S.get("ready_told"):
             S["ready_told"] = True
             await self.say(f"✅ Logged in. Balance {ai.balance:,.2f} {ai.currency}, leverage 1:{ai.leverage}.\n"

@@ -30,6 +30,9 @@ jobs:
       - name: Install Wine, MT5 and Python
         run: bash ci/setup_wine.sh
 
+      - name: Enable algorithmic trading in MT5
+        run: python3 ci/enable_algo.py
+
       - name: Restore saved state
         uses: actions/cache/restore@v4
         with:
